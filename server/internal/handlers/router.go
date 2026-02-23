@@ -19,8 +19,10 @@ type Router struct {
 }
 
 func New() *Router {
+	engine := gin.Default()
+	engine.MaxMultipartMemory = 512 << 20 // 512 MiB
 	return &Router{
-		engine: gin.Default(),
+		engine: engine,
 	}
 }
 
