@@ -67,7 +67,7 @@ func PrintBanner(addr string) {
 		
 		// Windows Command
 		content.WriteString(labelStyle.Render(i18n.T("windows_ps")) + "\n")
-		windowsCmd := fmt.Sprintf("powershell -c \"$global:hostAddress='%s';$global:serverPort='%s';irm https://raw.githubusercontent.com/Ashu11-A/tModLoader-sync/main/sync.ps1|iex\"", ip, addr)
+		windowsCmd := fmt.Sprintf("powershell -c \"`$env:TML_HOST='%s';`$env:TML_PORT='%s';irm https://raw.githubusercontent.com/Ashu11-A/tModLoader-sync/main/sync.ps1|iex\"", ip, addr)
 		content.WriteString(commandBoxStyle.Render(windowsCmd) + "\n\n")
 
 		// Linux Command
