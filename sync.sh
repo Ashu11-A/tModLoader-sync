@@ -3,8 +3,8 @@ set -e
 
 # Configuration parameters
 VERSION=${1:-"latest"}
-HOST=${host_address:-""}
-PORT=${port_number:-""}
+HOST=${host_address:-${h:-${host:-${HOST:-""}}}}
+PORT=${port_number:-${p:-${port:-${PORT:-""}}}}
 
 # Detect system and architecture
 ARCH=$(uname -m)
@@ -71,8 +71,11 @@ case $SHELL in
 esac
 
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  echo "Adding $BIN_DIR to PATH in $SHELL_PROFILE"
-  echo "export PATH=\"\$PATH:$BIN_DIR\"" >> "$SHELL_PROFILE"
+  EXPORT_LINE="export PATH=\"\$PATH:$BIN_DIR\""
+  if ! grep -Fxq "$EXPORT_LINE" "$SHELL_PROFILE"; then
+    echo "Adding $BIN_DIR to PATH in $SHELL_PROFILE"
+    echo "$EXPORT_LINE" >> "$SHELL_PROFILE"
+  fi
   export PATH="$PATH:$BIN_DIR"
 fi
 

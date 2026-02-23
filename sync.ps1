@@ -104,8 +104,8 @@ function Install-TMLSync {
   if ($h -ne "" -and $p -ne "") {
       # Port usually comes as ":8080", we need to strip the colon if it exists for the flag
       $portVal = $p.TrimStart(':')
-      Write-Output "To start syncing, run:"
-      Write-Output "${C_GREEN}tml-sync --host $h --port $portVal${C_RESET}"
+      Write-Output "${C_GREEN}Starting tml-sync connected to $h:$portVal...${C_RESET}"
+      & "$ExePath" --host "$h" --port "$portVal"
   } else {
       Write-Output "To start syncing, run: tml-sync --host <IP> --port <PORT>"
   }
