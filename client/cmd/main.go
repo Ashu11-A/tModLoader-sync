@@ -67,6 +67,7 @@ func main() {
 				}
 
 				if !scan {
+					apiClient.Stop()
 					p.Send(ui.StateMsg(ui.StateDone))
 					p.Send(ui.StatusMsg(i18n.T("done")))
 					return
@@ -163,6 +164,7 @@ func main() {
 					}
 				}
 
+				apiClient.Stop()
 				p.Send(ui.StateMsg(ui.StateDone))
 				p.Send(ui.StatusMsg(i18n.T("done")))
 			}()

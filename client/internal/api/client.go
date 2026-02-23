@@ -151,9 +151,21 @@ func (client *Client) UploadEnabledJSON(filePath, hash string, onProgress func(i
 		return err
 	}
 
-	if response.StatusCode() != http.StatusOK {
-		return fmt.Errorf("server error uploading enabled.json (%d): %s", response.StatusCode(), response.String())
+		if response.StatusCode() != http.StatusOK {
+			return fmt.Errorf("server error uploading enabled.json (%d): %s", response.StatusCode(), response.String())
+		}
+	
+		return nil
 	}
-
-	return nil
-}
+	
+	func (client *Client) Stop() error {
+		response, err := client.restClient.R().Post("/v1/stop")
+		if err != nil {
+			return err
+		}
+		if response.StatusCode() != http.StatusOK {
+			return fmt.Errorf("server error stopping (%d): %s", response.StatusCode(), response.String())
+		}
+		return nil
+	}
+	
