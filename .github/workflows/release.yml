@@ -9,6 +9,8 @@ jobs:
   build:
     name: Build and Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,7 +29,14 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Install dependencies
-        run: go mod download
+        run: |
+          # Initialize workspace as go.work is gitignored
+          go work init ./client ./server ./shared
+          # Download dependencies for each module
+          for dir in client server shared; do
+            echo "Installing dependencies for $dir..."
+            (cd $dir && go mod download)
+          done
 
       - name: Run Build Script
         run: |
