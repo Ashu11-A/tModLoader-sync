@@ -13,6 +13,11 @@ import (
 
 // GetSyncStatus returns the list of mods and the hash of enabled.json on the server.
 func GetSyncStatus(ctx *gin.Context) {
+	// Ensure the directory exists
+	if _, err := os.Stat(filepath.Dir(models.SyncFile)); os.IsNotExist(err) {
+		os.MkdirAll(filepath.Dir(models.SyncFile), 0755)
+	}
+
 	var data models.SyncData
 
 	content, err := os.ReadFile(models.SyncFile)

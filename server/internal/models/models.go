@@ -16,7 +16,7 @@ type SyncData struct {
 
 const (
 	// SyncFile is the name of the file storing server's sync metadata.
-	SyncFile = "sync.json"
+	SyncFile = "Mods/sync.json"
 	// ModsDir is the directory where the mod files are stored.
 	ModsDir = "Mods"
 )

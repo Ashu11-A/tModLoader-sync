@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"tml-sync/server/internal/models"
 
@@ -17,6 +18,10 @@ func TestGetSyncStatus(t *testing.T) {
 	router := gin.Default()
 	router.GET("/sync", GetSyncStatus)
 
+	// Ensure Mods directory exists for the test and clean it up afterward
+	_ = os.MkdirAll(filepath.Dir(models.SyncFile), 0755)
+	defer os.RemoveAll(filepath.Dir(models.SyncFile))
+
 	// Create dummy sync.json
 	data := models.SyncData{
 		Mods: []models.ModMetadata{
@@ -26,7 +31,6 @@ func TestGetSyncStatus(t *testing.T) {
 	}
 	content, _ := json.Marshal(data)
 	_ = os.WriteFile(models.SyncFile, content, 0644)
-	defer os.Remove(models.SyncFile)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/sync", nil)

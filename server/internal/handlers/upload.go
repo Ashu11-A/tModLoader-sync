@@ -16,7 +16,17 @@ import (
 func UploadMod(ctx *gin.Context) {
 	file, err := ctx.FormFile("mod")
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No mod file provided"})
+		fmt.Printf("Error receiving mod file: %v\n", err)
+		// Try to see if there are ANY files
+		form, _ := ctx.MultipartForm()
+		if form != nil {
+			fmt.Printf("Received files: %v\n", form.File)
+			fmt.Printf("Received values: %v\n", form.Value)
+		}
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("No mod file provided: %v", err),
+			"details": "Check server logs for more info",
+		})
 		return
 	}
 
@@ -119,6 +129,11 @@ func UploadEnabledJSON(ctx *gin.Context) {
 }
 
 func isAlreadySynced(name, hash string) bool {
+	// Ensure the directory exists
+	if _, err := os.Stat(filepath.Dir(models.SyncFile)); os.IsNotExist(err) {
+		os.MkdirAll(filepath.Dir(models.SyncFile), 0755)
+	}
+
 	var data models.SyncData
 	content, err := os.ReadFile(models.SyncFile)
 	if err != nil {
@@ -135,6 +150,11 @@ func isAlreadySynced(name, hash string) bool {
 }
 
 func updateSyncMetadata(name, version, hash string) {
+	// Ensure the directory exists
+	if _, err := os.Stat(filepath.Dir(models.SyncFile)); os.IsNotExist(err) {
+		os.MkdirAll(filepath.Dir(models.SyncFile), 0755)
+	}
+
 	var data models.SyncData
 	content, err := os.ReadFile(models.SyncFile)
 	if err == nil {
