@@ -1,23 +1,21 @@
 #!/usr/bin/env pwsh
 param(
   [String]$Version = "latest",
-  [String]$h = "", # Server host
-  [String]$p = ""  # Server port
-);
+  [String]$hostAddress = "",
+  [String]$serverPort = ""
+)
 
-# If not provided via params, check if they exist in the caller's scope
-if ($h -eq "" -and $null -ne $global:h) { $h = $global:h }
-if ($p -eq "" -and $null -ne $global:p) { $p = $global:p }
+if ($hostAddress -eq "" -and $null -ne $global:hostAddress) { $hostAddress = $global:hostAddress }
+if ($serverPort -eq "" -and $null -ne $global:serverPort) { $serverPort = $global:serverPort }
 
-# Detect architecture
 $ArchLabel = ""
 if ($env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
-    $ArchLabel = "x64"
+  $ArchLabel = "x64"
 } elseif ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
-    $ArchLabel = "arm64"
+  $ArchLabel = "arm64"
 } else {
-    Write-Output "Install Failed: Windows $env:PROCESSOR_ARCHITECTURE is not supported.`n"
-    return 1
+  Write-Output "Installation failed: Windows $env:PROCESSOR_ARCHITECTURE not supported.`n"
+  return 1
 }
 
 $ErrorActionPreference = "Stop"
@@ -27,8 +25,8 @@ function Publish-Env {
     Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
 [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
 public static extern IntPtr SendMessageTimeout(
-    IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam,
-    uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+  IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam,
+  uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
 "@
   }
   $HWND_BROADCAST = [IntPtr] 0xffff
@@ -65,12 +63,11 @@ function Get-Env {
 }
 
 function Install-TMLSync {
-  param([string]$Version);
+  param([string]$Version)
 
   $InstallRoot = "${Home}\.tml-sync"
   $BinDir = mkdir -Force "${InstallRoot}\bin"
   
-  # Binary naming convention: client-windows-x64.exe or client-windows-arm64.exe
   $Target = "client-windows-$ArchLabel.exe"
   $URL = "https://github.com/Ashu11-A/tModLoader-sync/releases/$(if ($Version -eq "latest") { "latest/download" } else { "download/$Version" })/$Target"
 
@@ -85,11 +82,10 @@ function Install-TMLSync {
   }
 
   if (!(Test-Path $ExePath)) {
-    Write-Output "Install Failed - could not download $URL"
+    Write-Output "Installation failed - could not download $URL"
     return 1
   }
 
-  # Add to PATH if not already there
   $Path = (Get-Env -Key "Path") -split ';'
   if ($Path -notcontains $BinDir) {
     $Path += $BinDir
@@ -99,15 +95,14 @@ function Install-TMLSync {
 
   $C_RESET = [char]27 + "[0m"
   $C_GREEN = [char]27 + "[1;32m"
-  Write-Output "${C_GREEN}tModLoader-sync was installed successfully!${C_RESET}"
+  Write-Output "${C_GREEN}tModLoader-sync installed successfully!${C_RESET}"
   
-  if ($h -ne "" -and $p -ne "") {
-      # Port usually comes as ":8080", we need to strip the colon if it exists for the flag
-      $portVal = $p.TrimStart(':')
-      Write-Output "${C_GREEN}Starting tml-sync connected to $h:$portVal...${C_RESET}"
-      & "$ExePath" --host "$h" --port "$portVal"
+  if ($hostAddress -ne "" -and $serverPort -ne "") {
+    $portVal = $serverPort.TrimStart(':')
+    Write-Output "${C_GREEN}Starting tml-sync connected to ${hostAddress}:${portVal}...${C_RESET}"
+    & "$ExePath" --host "$hostAddress" --port "$portVal"
   } else {
-      Write-Output "To start syncing, run: tml-sync --host <IP> --port <PORT>"
+    Write-Output "To start syncing, run: tml-sync --host <IP> --port <PORT>"
   }
 }
 
