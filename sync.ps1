@@ -1,26 +1,23 @@
 #!/usr/bin/env pwsh
-param(
-  [String]$Version = "latest",
-  [String]$hostAddress = "",
-  [String]$serverPort = ""
-)
 
-if ($hostAddress -eq "" -and $null -ne $global:hostAddress) { $hostAddress = $global:hostAddress }
-if ($serverPort -eq "" -and $null -ne $global:serverPort) { $serverPort = $global:serverPort }
+# Sem param() - leitura direta de variáveis de ambiente
+$Version     = if ($env:TML_VERSION) { $env:TML_VERSION } else { "latest" }
+$ResolvedHost = $env:TML_HOST
+$ResolvedPort = $env:TML_PORT
 
-$ArchLabel = ""
+$ArchitectureLabel = ""
 if ($env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
-  $ArchLabel = "x64"
+  $ArchitectureLabel = "x64"
 } elseif ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
-  $ArchLabel = "arm64"
+  $ArchitectureLabel = "arm64"
 } else {
-  Write-Output "Installation failed: Windows $env:PROCESSOR_ARCHITECTURE not supported.`n"
+  Write-Output "Falha na instalação: Windows $env:PROCESSOR_ARCHITECTURE não suportado.`n"
   return 1
 }
 
 $ErrorActionPreference = "Stop"
 
-function Publish-Env {
+function Publish-EnvironmentVariables {
   if (-not ("Win32.NativeMethods" -as [Type])) {
     Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
 [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -29,81 +26,86 @@ public static extern IntPtr SendMessageTimeout(
   uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
 "@
   }
-  $HWND_BROADCAST = [IntPtr] 0xffff
-  $WM_SETTINGCHANGE = 0x1a
-  $result = [UIntPtr]::Zero
-  [Win32.NativeMethods]::SendMessageTimeout($HWND_BROADCAST,
-    $WM_SETTINGCHANGE,
-    [UIntPtr]::Zero,
-    "Environment",
-    2,
-    5000,
-    [ref] $result
+  $HwndBroadcast = [IntPtr] 0xffff
+  $WmSettingChange = 0x1a
+  $ResultPointer = [UIntPtr]::Zero
+  [Win32.NativeMethods]::SendMessageTimeout(
+    $HwndBroadcast, $WmSettingChange, [UIntPtr]::Zero,
+    "Environment", 2, 5000, [ref] $ResultPointer
   ) | Out-Null
 }
 
-function Write-Env {
-  param([String]$Key, [String]$Value)
-  $RegisterKey = Get-Item -Path 'HKCU:'
-  $EnvRegisterKey = $RegisterKey.OpenSubKey('Environment', $true)
-  if ($null -eq $Value) {
-    $EnvRegisterKey.DeleteValue($Key)
+function Write-EnvironmentVariable {
+  param([String]$KeyName, [String]$KeyValue)
+  $RegistryKey = Get-Item -Path 'HKCU:'
+  $EnvironmentKey = $RegistryKey.OpenSubKey('Environment', $true)
+  if ($null -eq $KeyValue) {
+    $EnvironmentKey.DeleteValue($KeyName)
   } else {
-    $RegistryValueKind = if ($Value.Contains('%')) { [Microsoft.Win32.RegistryValueKind]::ExpandString } else { [Microsoft.Win32.RegistryValueKind]::String }
-    $EnvRegisterKey.SetValue($Key, $Value, $RegistryValueKind)
+    $RegistryValueKind = if ($KeyValue.Contains('%')) { [Microsoft.Win32.RegistryValueKind]::ExpandString } else { [Microsoft.Win32.RegistryValueKind]::String }
+    $EnvironmentKey.SetValue($KeyName, $KeyValue, $RegistryValueKind)
   }
-  Publish-Env
+  Publish-EnvironmentVariables
 }
 
-function Get-Env {
-  param([String] $Key)
-  $RegisterKey = Get-Item -Path 'HKCU:'
-  $EnvRegisterKey = $RegisterKey.OpenSubKey('Environment')
-  $EnvRegisterKey.GetValue($Key, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+function Get-EnvironmentVariable {
+  param([String]$KeyName)
+  $RegistryKey = Get-Item -Path 'HKCU:'
+  $EnvironmentKey = $RegistryKey.OpenSubKey('Environment')
+  $EnvironmentKey.GetValue($KeyName, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
 }
 
 function Install-TMLSync {
-  param([string]$Version)
+  param(
+    [string]$TargetVersion,
+    [string]$HostIp,
+    [string]$Port
+  )
 
-  $InstallRoot = "${Home}\.tml-sync"
-  $BinDir = mkdir -Force "${InstallRoot}\bin"
-  
-  $Target = "client-windows-$ArchLabel.exe"
-  $URL = "https://github.com/Ashu11-A/tModLoader-sync/releases/$(if ($Version -eq "latest") { "latest/download" } else { "download/$Version" })/$Target"
+  $InstallationRoot = "${Home}\.tml-sync"
+  $BinaryDirectory  = "${InstallationRoot}\bin"
+  New-Item -ItemType Directory -Force -Path $BinaryDirectory | Out-Null
 
-  $ExePath = "${BinDir}\tml-sync.exe"
+  $TargetFileName = "client-windows-$ArchitectureLabel.exe"
+  $DownloadUrl    = "https://github.com/Ashu11-A/tModLoader-sync/releases/$(if ($TargetVersion -eq 'latest') { 'latest/download' } else { "download/$TargetVersion" })/$TargetFileName"
+  $ExecutablePath = "${BinaryDirectory}\tml-sync.exe"
 
-  Write-Output "Downloading tModLoader-sync ($Version) for windows/$ArchLabel..."
-  
+  Write-Output "Baixando tModLoader-sync ($TargetVersion) para windows/$ArchitectureLabel..."
+
   if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) {
-    curl.exe "-#SfLo" "$ExePath" "$URL"
+    curl.exe "-#SfLo" "$ExecutablePath" "$DownloadUrl"
   } else {
-    Invoke-RestMethod -Uri $URL -OutFile $ExePath
+    Invoke-RestMethod -Uri $DownloadUrl -OutFile $ExecutablePath
   }
 
-  if (!(Test-Path $ExePath)) {
-    Write-Output "Installation failed - could not download $URL"
+  if (-not (Test-Path $ExecutablePath)) {
+    Write-Output "Falha na instalação - não foi possível baixar de $DownloadUrl"
     return 1
   }
 
-  $Path = (Get-Env -Key "Path") -split ';'
-  if ($Path -notcontains $BinDir) {
-    $Path += $BinDir
-    Write-Env -Key 'Path' -Value ($Path -join ';')
-    $env:PATH = $Path -join ';'
+  $CurrentPath = (Get-EnvironmentVariable -KeyName "Path") -split ';'
+  if ($CurrentPath -notcontains $BinaryDirectory) {
+    $CurrentPath += $BinaryDirectory
+    Write-EnvironmentVariable -KeyName 'Path' -KeyValue ($CurrentPath -join ';')
+    $env:PATH = $CurrentPath -join ';'
   }
 
-  $C_RESET = [char]27 + "[0m"
-  $C_GREEN = [char]27 + "[1;32m"
-  Write-Output "${C_GREEN}tModLoader-sync installed successfully!${C_RESET}"
-  
-  if ($hostAddress -ne "" -and $serverPort -ne "") {
-    $portVal = $serverPort.TrimStart(':')
-    Write-Output "${C_GREEN}Starting tml-sync connected to ${hostAddress}:${portVal}...${C_RESET}"
-    & "$ExePath" --host "$hostAddress" --port "$portVal"
-  } else {
-    Write-Output "To start syncing, run: tml-sync --host <IP> --port <PORT>"
+  $ColorReset = [char]27 + "[0m"
+  $ColorGreen = [char]27 + "[1;32m"
+  Write-Output "${ColorGreen}tModLoader-sync instalado com sucesso!${ColorReset}"
+
+  if ([string]::IsNullOrWhiteSpace($HostIp)) {
+    $HostIp = Read-Host "Digite o IP do servidor"
   }
+
+  if ([string]::IsNullOrWhiteSpace($Port)) {
+    $Port = Read-Host "Digite a porta do servidor (ex: 25005)"
+  }
+
+  $FormattedPort = $Port.TrimStart(':')
+  Write-Output "${ColorGreen}Iniciando tml-sync conectado a ${HostIp}:${FormattedPort}...${ColorReset}"
+
+  & "$ExecutablePath" --host "$HostIp" --port "$FormattedPort"
 }
 
-Install-TMLSync -Version $Version
+Install-TMLSync -TargetVersion $Version -HostIp $ResolvedHost -Port $ResolvedPort
